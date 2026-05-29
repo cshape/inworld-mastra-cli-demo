@@ -30,7 +30,7 @@ Headphones strongly recommended: without them, speaker audio bleeds into the mic
 
 ## How the package dependency resolves
 
-`InworldRealtimeVoice` ships in `@mastra/voice-inworld` (alongside the batch `InworldVoice` TTS/STT). The published version doesn't include it yet, so this repo ships a packed tarball (`mastra-voice-inworld-0.2.0.tgz`) and `package.json` points at it via a `file:` link. Once the updated package is published, swap that line in `package.json` for a normal version range.
+`InworldRealtimeVoice` ships in `@mastra/voice-inworld` (alongside the batch `InworldVoice` TTS/STT). The published version doesn't include it yet, so this repo ships a packed tarball (`mastra-voice-inworld-0.2.1-alpha.0.tgz`) and `package.json` points at it via a `file:` link. Once the updated package is published, swap that line in `package.json` for a normal version range.
 
 To refresh the tarball from a local mastra checkout:
 
@@ -47,7 +47,7 @@ pnpm install
 
 - `src/main.ts` — the entire demo: Agent + voice + mic/speaker plumbing
 - `package.json` — runtime deps: `@mastra/core` (from npm), `@mastra/voice-inworld` (local tarball), `dotenv`, `zod`
-- `mastra-voice-inworld-0.2.0.tgz` — packed voice-package build
+- `mastra-voice-inworld-0.2.1-alpha.0.tgz` — packed voice-package build
 - `tsconfig.json` — strict ESM/NodeNext
 - `.env.example` — copy to `.env` and fill in `INWORLD_API_KEY`
 

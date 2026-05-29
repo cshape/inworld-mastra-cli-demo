@@ -24,7 +24,12 @@ new Agent({
   instructions: 'You are a concise voice assistant. Reply in one or two short sentences. Use the get-current-time tool when asked the time.',
   model: 'n/a',
   tools: { getCurrentTime },
-  voice,
+  // Cast: voice packages bundle their own copy of MastraVoice's base class
+  // (extracted into the private @internal/voice package), whose ECMAScript
+  // private brand differs from the @mastra/core copy the Agent's type expects.
+  // The two are interchangeable at runtime; only the structural type check
+  // trips on the private brand. This affects every current voice package.
+  voice: voice as unknown as Agent['voice'],
 });
 
 const SOX = ['-t', 'raw', '-r', '24000', '-e', 'signed', '-b', '16', '-c', '1', '-q', '-'];

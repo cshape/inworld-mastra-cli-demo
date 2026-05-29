@@ -8,8 +8,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mastra/core": "^1.33.0",
-    "@mastra/voice-inworld": "file:./mastra-voice-inworld-0.2.0.tgz",
+    "@mastra/core": "1.38.0-alpha.2",
+    "@mastra/voice-inworld": "file:./mastra-voice-inworld-0.2.1-alpha.0.tgz",
     "dotenv": "^16.4.5",
     "zod": "^3.25.0"
   },
