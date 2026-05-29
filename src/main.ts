@@ -17,6 +17,13 @@ const voice = new InworldRealtimeVoice({
   // Rely on the package defaults: model 'inworld/models/gemma-4-26b-a4b-it',
   // speaker 'Sarah', STT 'inworld/inworld-stt-1', semantic-VAD turn detection.
   // Override any of these here (e.g. model: 'openai/gpt-5.4-nano', speaker: 'Jason').
+  providerData: {
+    // Back-channels ("uh-huh", "I see") are short interjections the agent
+    // emits WHILE you're still speaking. They're meant to overlap your speech,
+    // so they are deliberately NOT cancelled by barge-in (see the `backchannel`
+    // handler below). Gated by server prerequisites — ask your Inworld account team.
+    backchannel: { enabled: true },
+  },
 });
 
 new Agent({
@@ -34,7 +41,12 @@ new Agent({
 });
 
 const SOX = ['-t', 'raw', '-r', '24000', '-e', 'signed', '-b', '16', '-c', '1', '-q', '-'];
+// Main assistant-response players, keyed by response_id. These ARE stopped on
+// barge-in (`interrupted`) so the agent shuts up the instant you speak.
 const players = new Map<string, ChildProcess>();
+// Back-channel players, keyed by backchannel_id. Kept in a SEPARATE map that
+// barge-in never touches, so interjections keep playing over your speech.
+const bcPlayers = new Map<string, ChildProcess>();
 
 voice.on('speaker', stream => {
   // Any new response supersedes the prior one — kill leftover players so
@@ -51,7 +63,25 @@ voice.on('speaker', stream => {
   player.on('exit', () => players.delete(id));
 });
 
+// Barge-in: stop ONLY the main response audio. `interrupted` carries a
+// response_id that matches a `speaker` stream, never a back-channel — so
+// back-channel players are untouched and keep playing over your speech.
 voice.on('interrupted', ({ response_id }) => players.get(response_id)?.kill('SIGTERM'));
+
+// Back-channel audio arrives on its own `backchannel` event (separate from
+// `speaker`). Play it on the separate `bcPlayers` track; the stream ends
+// itself on `backchannel.done`, so the player exits naturally. We never kill
+// these on barge-in — that's the whole point of a back-channel.
+voice.on('backchannel', stream => {
+  const id = (stream as unknown as { id: string }).id;
+  const player = spawn('play', SOX, { stdio: ['pipe', 'ignore', 'ignore'] });
+  bcPlayers.set(id, player);
+  player.stdin!.on('error', () => {});
+  stream.pipe(player.stdin!);
+  player.on('exit', () => bcPlayers.delete(id));
+});
+voice.on('backchannel.done', ({ phrase }) => phrase && process.stdout.write(`\n[backchannel] ${phrase}`));
+voice.on('backchannel.skipped', ({ reason }) => void reason);
 
 let lastRole: 'user' | 'assistant' | null = null;
 voice.on('writing', ({ text, role }) => {
@@ -74,6 +104,7 @@ await voice.send(mic.stdout);
 process.on('SIGINT', () => {
   mic.kill('SIGTERM');
   for (const p of players.values()) p.kill('SIGTERM');
+  for (const p of bcPlayers.values()) p.kill('SIGTERM');
   voice.close();
   process.exit(0);
 });

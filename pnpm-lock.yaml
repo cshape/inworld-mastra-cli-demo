@@ -271,7 +271,7 @@ packages:
       zod: ^3.25.0 || ^4.0.0
 
   '@mastra/voice-inworld@file:mastra-voice-inworld-0.2.1-alpha.0.tgz':
-    resolution: {integrity: sha512-ufqMMufF2ZIE+N5BkHHWAmOrE+Nq2SzL+movtmcvctT9Zwd2KXyaMfNvvZUpmKVTye3gbcp5H39TJs1LlrM/OQ==, tarball: file:mastra-voice-inworld-0.2.1-alpha.0.tgz}
+    resolution: {integrity: sha512-KCsWA/KMvgH9gdYzNNIKJEzSMo8RXWMKeSq82gy51vh1oU8w4iqW7YHxYzf3kMn1mV7nHiLzoJAhQoTzv2wKwg==, tarball: file:mastra-voice-inworld-0.2.1-alpha.0.tgz}
     version: 0.2.1-alpha.0
     engines: {node: '>=22.13.0'}
     peerDependencies:
