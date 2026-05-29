@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@mastra/core": "^1.33.0",
-    "@mastra/voice-inworld-realtime": "file:./mastra-voice-inworld-realtime-0.0.1.tgz",
+    "@mastra/voice-inworld": "file:./mastra-voice-inworld-0.2.0.tgz",
     "dotenv": "^16.4.5",
     "zod": "^3.25.0"
   },

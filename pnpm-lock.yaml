@@ -11,9 +11,9 @@ importers:
       '@mastra/core':
         specifier: ^1.33.0
         version: 1.33.1(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(quansync@0.2.11)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(quansync@0.2.11)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(@standard-schema/spec@1.1.0)(openapi-types@12.1.3)(zod@3.25.76))(@types/json-schema@7.0.15)(express@5.2.1)(openapi-types@12.1.3)(zod@3.25.76)
-      '@mastra/voice-inworld-realtime':
-        specifier: file:./mastra-voice-inworld-realtime-0.0.1.tgz
-        version: file:mastra-voice-inworld-realtime-0.0.1.tgz(@mastra/core@1.33.1(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(quansync@0.2.11)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(quansync@0.2.11)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(@standard-schema/spec@1.1.0)(openapi-types@12.1.3)(zod@3.25.76))(@types/json-schema@7.0.15)(express@5.2.1)(openapi-types@12.1.3)(zod@3.25.76))(zod@3.25.76)
+      '@mastra/voice-inworld':
+        specifier: file:./mastra-voice-inworld-0.2.0.tgz
+        version: file:mastra-voice-inworld-0.2.0.tgz(@mastra/core@1.33.1(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(quansync@0.2.11)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(quansync@0.2.11)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(@standard-schema/spec@1.1.0)(openapi-types@12.1.3)(zod@3.25.76))(@types/json-schema@7.0.15)(express@5.2.1)(openapi-types@12.1.3)(zod@3.25.76))(zod@3.25.76)
       dotenv:
         specifier: ^16.4.5
         version: 16.6.1
@@ -270,9 +270,9 @@ packages:
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
 
-  '@mastra/voice-inworld-realtime@file:mastra-voice-inworld-realtime-0.0.1.tgz':
-    resolution: {integrity: sha512-aY4IpSU2eDk4AwKAL8SQADzFmPz1eim92Wap9Xn2KJSiFlaEi8d0dExzYXITj/unNfHI4vgFamLxMQh3ULAGjQ==, tarball: file:mastra-voice-inworld-realtime-0.0.1.tgz}
-    version: 0.0.1
+  '@mastra/voice-inworld@file:mastra-voice-inworld-0.2.0.tgz':
+    resolution: {integrity: sha512-HgJRWhxkofxAwNdZPIV3PqRWGzouzZmvY6sXYjGN1Z3CO+XMX2mFVF9rWHjiKjUGRkdl9od1tu0OjECgmzArWA==, tarball: file:mastra-voice-inworld-0.2.0.tgz}
+    version: 0.2.0
     engines: {node: '>=22.13.0'}
     peerDependencies:
       '@mastra/core': '>=1.0.0-0 <2.0.0-0'
@@ -1358,7 +1358,7 @@ snapshots:
       zod-from-json-schema-v3: zod-from-json-schema@0.0.5
       zod-to-json-schema: 3.25.2(zod@3.25.76)
 
-  '@mastra/voice-inworld-realtime@file:mastra-voice-inworld-realtime-0.0.1.tgz(@mastra/core@1.33.1(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(quansync@0.2.11)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(quansync@0.2.11)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(@standard-schema/spec@1.1.0)(openapi-types@12.1.3)(zod@3.25.76))(@types/json-schema@7.0.15)(express@5.2.1)(openapi-types@12.1.3)(zod@3.25.76))(zod@3.25.76)':
+  '@mastra/voice-inworld@file:mastra-voice-inworld-0.2.0.tgz(@mastra/core@1.33.1(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(quansync@0.2.11)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(quansync@0.2.11)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(@standard-schema/spec@1.1.0)(openapi-types@12.1.3)(zod@3.25.76))(@types/json-schema@7.0.15)(express@5.2.1)(openapi-types@12.1.3)(zod@3.25.76))(zod@3.25.76)':
     dependencies:
       '@mastra/core': 1.33.1(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(quansync@0.2.11)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(quansync@0.2.11)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(@standard-schema/spec@1.1.0)(openapi-types@12.1.3)(zod@3.25.76))(@types/json-schema@7.0.15)(express@5.2.1)(openapi-types@12.1.3)(zod@3.25.76)
       ws: 8.20.1

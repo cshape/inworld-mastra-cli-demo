@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { Agent } from '@mastra/core/agent';
 import { createTool } from '@mastra/core/tools';
-import { InworldRealtimeVoice } from '@mastra/voice-inworld-realtime';
+import { InworldRealtimeVoice } from '@mastra/voice-inworld';
 import { z } from 'zod';
 
 const getCurrentTime = createTool({
