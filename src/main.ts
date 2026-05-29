@@ -14,7 +14,7 @@ const getCurrentTime = createTool({
 });
 
 const voice = new InworldRealtimeVoice({
-  // Rely on the package defaults: model 'inworld/models/gemma-4-26b-a4b-it-maas',
+  // Rely on the package defaults: model 'inworld/models/gemma-4-26b-a4b-it',
   // speaker 'Sarah', STT 'inworld/inworld-stt-1', semantic-VAD turn detection.
   // Override any of these here (e.g. model: 'openai/gpt-5.4-nano', speaker: 'Jason').
 });
