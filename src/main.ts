@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { Agent } from '@mastra/core/agent';
 import { createTool } from '@mastra/core/tools';
 import { InworldRealtimeVoice } from '@mastra/voice-inworld';
@@ -63,43 +63,37 @@ new Agent({
 
 const SOX = ['-t', 'raw', '-r', '24000', '-e', 'signed', '-b', '16', '-c', '1', '-q', '-'];
 
-// ONE persistent output process for the whole session. Spawning a fresh `play`
-// per clip pays ~100-300ms of audio-device-open latency — longer than a short
-// back-channel ("mhm"), so those clips finished before the device was ready and
-// you'd only hear a blip. Keeping a single `play` open holds the device warm, so
-// every clip — main response AND back-channel — is audible. Both write into this
-// one stdin (we never close it, so it stays open across clips).
-//
-// `--buffer 1024`: sox processes audio in fixed-size blocks. At the default
-// (~8 KB ≈ 170ms) the sub-block TAIL of each clip sits unplayed until the next
-// clip's bytes fill the block — so the end of a response got clipped and replayed
-// at the start of the next one. A small block (~1 KB ≈ 20ms) flushes the tail
-// promptly; 20ms of latency is imperceptible.
-const out = spawn('play', ['--buffer', '1024', ...SOX], { stdio: ['pipe', 'ignore', 'ignore'] });
-out.stdin!.on('error', () => {}); // swallow EPIPE if `play` exits
-
-// Main-response streams, keyed by response_id, so barge-in can stop just those.
-const mainStreams = new Map<string, NodeJS.ReadableStream>();
+// Main responses: ONE short-lived `play` per response, keyed by response_id.
+// Killing the process is the only way to stop playback instantly on barge-in —
+// piping into a shared persistent player can't, because the OS pipe + sox
+// buffers already hold up to ~1s of audio that keeps draining after you stop
+// feeding it. So main responses get their own killable players.
+const players = new Map<string, ChildProcess>();
 
 voice.on('speaker', stream => {
+  // A new response supersedes the previous one — kill leftover main players.
+  for (const p of players.values()) p.kill('SIGTERM');
+  players.clear();
   const id = (stream as unknown as { id: string }).id;
-  mainStreams.set(id, stream);
-  stream.pipe(out.stdin!, { end: false }); // { end: false } keeps the shared stdin open
-  stream.on('end', () => mainStreams.delete(id));
+  const player = spawn('play', SOX, { stdio: ['pipe', 'ignore', 'ignore'] });
+  players.set(id, player);
+  player.stdin!.on('error', () => {}); // swallow EPIPE when killed mid-flush
+  stream.pipe(player.stdin!);
+  player.on('exit', () => players.delete(id));
 });
 
-// Barge-in: stop feeding the interrupted response's audio into the shared
-// output. The SDK already sent `response.cancel` to stop the server; here we
-// just unpipe + drain so the main voice goes quiet fast WITHOUT killing the
-// process — back-channels share this output and must keep playing.
-voice.on('interrupted', ({ response_id }) => {
-  const stream = mainStreams.get(response_id);
-  if (stream) {
-    stream.unpipe(out.stdin!);
-    stream.resume(); // discard any late/buffered audio for this response
-    mainStreams.delete(response_id);
-  }
-});
+// Barge-in: kill the interrupted response's player for an INSTANT stop. The SDK
+// also sent `response.cancel` to stop the server. Back-channels live on a
+// separate, persistent output (below) and are deliberately never killed here.
+voice.on('interrupted', ({ response_id }) => players.get(response_id)?.kill('SIGTERM'));
+
+// Back-channels: ONE persistent `play` opened up front. A fresh `play` per clip
+// pays ~100-300ms of device-open latency — longer than a short "mhm", so those
+// were only a blip. A warm, always-open device makes them audible. `--buffer
+// 1024` (~20ms block) flushes each clip's tail so consecutive back-channels
+// don't bleed together. We never kill this (back-channels overlap your speech).
+const bc = spawn('play', ['--buffer', '1024', ...SOX], { stdio: ['pipe', 'ignore', 'ignore'] });
+bc.stdin!.on('error', () => {});
 
 // Single label-tracking printer so transcripts and back-channel lines never
 // run together. A new label (you / bot / backchannel) starts a fresh line;
@@ -145,7 +139,7 @@ voice.on('backchannel', stream => {
     return;
   }
   playingBc.add(id);
-  stream.pipe(out.stdin!, { end: false });
+  stream.pipe(bc.stdin!, { end: false });
 });
 voice.on('backchannel.done', ({ backchannel_id, phrase }) => {
   if (playingBc.delete(backchannel_id) && phrase) {
@@ -181,7 +175,8 @@ await voice.send(mic.stdout);
 
 process.on('SIGINT', () => {
   mic.kill('SIGTERM');
-  out.kill('SIGTERM');
+  for (const p of players.values()) p.kill('SIGTERM');
+  bc.kill('SIGTERM');
   voice.close();
   process.exit(0);
 });
