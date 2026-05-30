@@ -101,43 +101,77 @@ voice.on('interrupted', ({ response_id }) => {
   }
 });
 
-// Track whether you're currently speaking, from VAD edges. We start "stopped"
-// false so a back-channel before the first VAD edge still plays.
-let userStopped = false;
-voice.on('speech-started', () => {
-  userStopped = false;
-});
-voice.on('speech-stopped', () => {
-  userStopped = true;
-});
-
-// Back-channels write into the SAME shared output and are NEVER stopped on
-// barge-in once playing — that's the whole point (they overlap your speech).
-// But a back-channel is decided from your last partial transcript, so one can
-// arrive just after you stop and land in the post-turn silence, which feels
-// off. So we only START playing a back-channel while you're still speaking;
-// any that arrives after `speech-stopped` is drained and dropped.
-voice.on('backchannel', stream => {
-  if (userStopped) {
-    stream.resume(); // you already stopped — discard so it doesn't play late
-    return;
-  }
-  stream.pipe(out.stdin!, { end: false });
-});
-voice.on('backchannel.done', ({ phrase }) => phrase && process.stdout.write(`\n[backchannel] ${phrase}`));
-voice.on('backchannel.skipped', () => {});
-
-let lastRole: 'user' | 'assistant' | null = null;
-voice.on('writing', ({ text, role }) => {
-  if (role !== lastRole) {
-    process.stdout.write(role === 'user' ? '\n[you] ' : '\n[bot] ');
-    lastRole = role;
+// Single label-tracking printer so transcripts and back-channel lines never
+// run together. A new label (you / bot / backchannel) starts a fresh line;
+// same-label text appends. `endLine()` resets the label so the next write —
+// even same role — starts a new line.
+let lastLabel: string | null = null;
+function print(label: string, text: string) {
+  if (label !== lastLabel) {
+    process.stdout.write(`\n[${label}] `);
+    lastLabel = label;
   }
   process.stdout.write(text);
+}
+function endLine() {
+  lastLabel = null;
+}
+
+// "Is the user speaking?" gate for back-channels. A back-channel is decided
+// from your last partial transcript, so one can be synthesized just after you
+// stop and land in the post-turn silence. We only play back-channels while
+// you're speaking: mark speaking on the start signals (VAD speech-started, or
+// barge-in) and stopped on the end signals (VAD speech-stopped, or your
+// finalized transcript — the transcript is the reliable backstop because
+// semantic-VAD edges don't always fire).
+let speaking = false;
+voice.on('speech-started', () => {
+  speaking = true;
+});
+voice.on('interrupted', () => {
+  speaking = true;
+});
+voice.on('speech-stopped', () => {
+  speaking = false;
 });
 
-voice.on('tool-call-start', ({ toolName }) => console.log(`\n[tool] ${toolName}`));
-voice.on('error', err => console.error('\n[error]', err));
+// Back-channels share the single output and are never stopped once playing.
+// Track which actually played so only those print a line.
+const playingBc = new Set<string>();
+voice.on('backchannel', stream => {
+  const id = (stream as unknown as { id: string }).id;
+  if (!speaking) {
+    stream.resume(); // arrived after you stopped — discard so it doesn't play late
+    return;
+  }
+  playingBc.add(id);
+  stream.pipe(out.stdin!, { end: false });
+});
+voice.on('backchannel.done', ({ backchannel_id, phrase }) => {
+  if (playingBc.delete(backchannel_id) && phrase) {
+    print('backchannel', phrase);
+    endLine();
+  }
+});
+voice.on('backchannel.skipped', () => {});
+
+voice.on('writing', ({ text, role }) => {
+  if (text === '\n') {
+    if (role === 'user') speaking = false; // finalized transcript = your turn ended
+    endLine(); // turn finished — next line gets a fresh label
+    return;
+  }
+  print(role === 'user' ? 'you' : 'bot', text);
+});
+
+voice.on('tool-call-start', ({ toolName }) => {
+  print('tool', toolName);
+  endLine();
+});
+voice.on('error', err => {
+  endLine();
+  console.error('\n[error]', err);
+});
 
 await voice.connect();
 console.log('Connected. Use headphones for best experience. Speak when ready. Ctrl+C to exit.');
