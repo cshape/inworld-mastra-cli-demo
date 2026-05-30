@@ -69,7 +69,13 @@ const SOX = ['-t', 'raw', '-r', '24000', '-e', 'signed', '-b', '16', '-c', '1', 
 // you'd only hear a blip. Keeping a single `play` open holds the device warm, so
 // every clip — main response AND back-channel — is audible. Both write into this
 // one stdin (we never close it, so it stays open across clips).
-const out = spawn('play', SOX, { stdio: ['pipe', 'ignore', 'ignore'] });
+//
+// `--buffer 1024`: sox processes audio in fixed-size blocks. At the default
+// (~8 KB ≈ 170ms) the sub-block TAIL of each clip sits unplayed until the next
+// clip's bytes fill the block — so the end of a response got clipped and replayed
+// at the start of the next one. A small block (~1 KB ≈ 20ms) flushes the tail
+// promptly; 20ms of latency is imperceptible.
+const out = spawn('play', ['--buffer', '1024', ...SOX], { stdio: ['pipe', 'ignore', 'ignore'] });
 out.stdin!.on('error', () => {}); // swallow EPIPE if `play` exits
 
 // Main-response streams, keyed by response_id, so barge-in can stop just those.
