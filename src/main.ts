@@ -22,7 +22,17 @@ const voice = new InworldRealtimeVoice({
     // emits WHILE you're still speaking. They're meant to overlap your speech,
     // so they are deliberately NOT cancelled by barge-in (see the `backchannel`
     // handler below). Gated by server prerequisites — ask your Inworld account team.
-    backchannel: { enabled: true },
+    //
+    // Tuned aggressive for testing — fire early and often. Dial these back
+    // toward the defaults (min_speech_ms 800, min_gap_ms 4000, max_per_turn 3,
+    // eval_interval_ms 800) for production naturalness.
+    backchannel: {
+      enabled: true,
+      min_speech_ms: 400, // start interjecting sooner after you begin speaking (default 800)
+      min_gap_ms: 1200, // allow them closer together (default 4000)
+      max_per_turn: 6, // more interjections per user turn (default 3)
+      eval_interval_ms: 400, // evaluate eligibility more often (default 800)
+    },
   },
 });
 
