@@ -101,9 +101,27 @@ voice.on('interrupted', ({ response_id }) => {
   }
 });
 
+// Track whether you're currently speaking, from VAD edges. We start "stopped"
+// false so a back-channel before the first VAD edge still plays.
+let userStopped = false;
+voice.on('speech-started', () => {
+  userStopped = false;
+});
+voice.on('speech-stopped', () => {
+  userStopped = true;
+});
+
 // Back-channels write into the SAME shared output and are NEVER stopped on
-// barge-in — that's the whole point of a back-channel (it overlaps your speech).
+// barge-in once playing — that's the whole point (they overlap your speech).
+// But a back-channel is decided from your last partial transcript, so one can
+// arrive just after you stop and land in the post-turn silence, which feels
+// off. So we only START playing a back-channel while you're still speaking;
+// any that arrives after `speech-stopped` is drained and dropped.
 voice.on('backchannel', stream => {
+  if (userStopped) {
+    stream.resume(); // you already stopped — discard so it doesn't play late
+    return;
+  }
   stream.pipe(out.stdin!, { end: false });
 });
 voice.on('backchannel.done', ({ phrase }) => phrase && process.stdout.write(`\n[backchannel] ${phrase}`));
