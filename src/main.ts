@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { Agent } from '@mastra/core/agent';
 import { createTool } from '@mastra/core/tools';
 import { InworldRealtimeVoice } from '@mastra/voice-inworld';
@@ -62,58 +62,46 @@ new Agent({
 });
 
 const SOX = ['-t', 'raw', '-r', '24000', '-e', 'signed', '-b', '16', '-c', '1', '-q', '-'];
-// Main assistant-response players, keyed by response_id. These ARE stopped on
-// barge-in (`interrupted`) so the agent shuts up the instant you speak.
-const players = new Map<string, ChildProcess>();
-// Back-channel players, keyed by backchannel_id. Kept in a SEPARATE map that
-// barge-in never touches, so interjections keep playing over your speech.
-const bcPlayers = new Map<string, ChildProcess>();
+
+// ONE persistent output process for the whole session. Spawning a fresh `play`
+// per clip pays ~100-300ms of audio-device-open latency — longer than a short
+// back-channel ("mhm"), so those clips finished before the device was ready and
+// you'd only hear a blip. Keeping a single `play` open holds the device warm, so
+// every clip — main response AND back-channel — is audible. Both write into this
+// one stdin (we never close it, so it stays open across clips).
+const out = spawn('play', SOX, { stdio: ['pipe', 'ignore', 'ignore'] });
+out.stdin!.on('error', () => {}); // swallow EPIPE if `play` exits
+
+// Main-response streams, keyed by response_id, so barge-in can stop just those.
+const mainStreams = new Map<string, NodeJS.ReadableStream>();
 
 voice.on('speaker', stream => {
-  // Any new response supersedes the prior one — kill leftover players so
-  // a missed barge-in can't leave two streams playing at once.
-  for (const p of players.values()) p.kill('SIGTERM');
-  players.clear();
   const id = (stream as unknown as { id: string }).id;
-  const player = spawn('play', SOX, { stdio: ['pipe', 'ignore', 'ignore'] });
-  players.set(id, player);
-  // Swallow EPIPE when `play` exits (natural end, or kill on barge-in) while
-  // the PassThrough is still flushing a few buffered audio frames.
-  player.stdin!.on('error', () => {});
-  stream.pipe(player.stdin!);
-  player.on('exit', () => players.delete(id));
+  mainStreams.set(id, stream);
+  stream.pipe(out.stdin!, { end: false }); // { end: false } keeps the shared stdin open
+  stream.on('end', () => mainStreams.delete(id));
 });
 
-// Barge-in: stop ONLY the main response audio. `interrupted` carries a
-// response_id that matches a `speaker` stream, never a back-channel — so
-// back-channel players are untouched and keep playing over your speech.
-voice.on('interrupted', ({ response_id }) => players.get(response_id)?.kill('SIGTERM'));
+// Barge-in: stop feeding the interrupted response's audio into the shared
+// output. The SDK already sent `response.cancel` to stop the server; here we
+// just unpipe + drain so the main voice goes quiet fast WITHOUT killing the
+// process — back-channels share this output and must keep playing.
+voice.on('interrupted', ({ response_id }) => {
+  const stream = mainStreams.get(response_id);
+  if (stream) {
+    stream.unpipe(out.stdin!);
+    stream.resume(); // discard any late/buffered audio for this response
+    mainStreams.delete(response_id);
+  }
+});
 
-// Back-channel audio arrives on its own `backchannel` event (separate from
-// `speaker`). Play it on the separate `bcPlayers` track; the stream ends
-// itself on `backchannel.done`, so the player exits naturally. We never kill
-// these on barge-in — that's the whole point of a back-channel.
+// Back-channels write into the SAME shared output and are NEVER stopped on
+// barge-in — that's the whole point of a back-channel (it overlaps your speech).
 voice.on('backchannel', stream => {
-  const id = (stream as unknown as { id: string }).id;
-  let bytes = 0;
-  stream.on('data', (c: Buffer) => (bytes += c.length));
-  const player = spawn('play', SOX, { stdio: ['pipe', 'ignore', 'ignore'] });
-  bcPlayers.set(id, player);
-  player.stdin!.on('error', () => {});
-  stream.pipe(player.stdin!);
-  // Diagnostics: signal !== null means something killed the player (it
-  // shouldn't — back-channels are barge-in-exempt); bytes === 0 means no audio
-  // ever arrived (server sent `done`/`skipped` without deltas).
-  player.on('exit', (code, signal) => {
-    bcPlayers.delete(id);
-    console.log(`\n[backchannel ${id}] player exit code=${code} signal=${signal} bytes=${bytes}`);
-  });
-  console.log(`\n[backchannel ${id}] start`);
+  stream.pipe(out.stdin!, { end: false });
 });
-voice.on('backchannel.done', ({ backchannel_id, phrase }) =>
-  console.log(`\n[backchannel ${backchannel_id}] done${phrase ? ` "${phrase}"` : ''}`),
-);
-voice.on('backchannel.skipped', ({ reason }) => console.log(`\n[backchannel skipped] ${reason}`));
+voice.on('backchannel.done', ({ phrase }) => phrase && process.stdout.write(`\n[backchannel] ${phrase}`));
+voice.on('backchannel.skipped', () => {});
 
 let lastRole: 'user' | 'assistant' | null = null;
 voice.on('writing', ({ text, role }) => {
@@ -135,8 +123,7 @@ await voice.send(mic.stdout);
 
 process.on('SIGINT', () => {
   mic.kill('SIGTERM');
-  for (const p of players.values()) p.kill('SIGTERM');
-  for (const p of bcPlayers.values()) p.kill('SIGTERM');
+  out.kill('SIGTERM');
   voice.close();
   process.exit(0);
 });
