@@ -14,9 +14,20 @@ const getCurrentTime = createTool({
 });
 
 const voice = new InworldRealtimeVoice({
-  // Rely on the package defaults: model 'inworld/models/gemma-4-26b-a4b-it',
-  // speaker 'Sarah', STT 'inworld/inworld-stt-1', semantic-VAD turn detection.
+  // Defaults: model 'inworld/models/gemma-4-26b-a4b-it', speaker 'Sarah',
+  // STT 'inworld/inworld-stt-1', semantic-VAD turn detection.
   // Override any of these here (e.g. model: 'openai/gpt-5.4-nano', speaker: 'Jason').
+  session: {
+    audio: {
+      input: {
+        // 'low' makes semantic VAD wait for clearer end-of-turn pauses before
+        // the bot responds — it was jumping in too quickly on 'medium'. This
+        // also gives back-channels a clean window to play during your speech
+        // without a competing main-response player fighting for the audio device.
+        turn_detection: { type: 'semantic_vad', eagerness: 'low' },
+      },
+    },
+  },
   providerData: {
     // Back-channels ("uh-huh", "I see") are short interjections the agent
     // emits WHILE you're still speaking. They're meant to overlap your speech,
@@ -84,14 +95,25 @@ voice.on('interrupted', ({ response_id }) => players.get(response_id)?.kill('SIG
 // these on barge-in — that's the whole point of a back-channel.
 voice.on('backchannel', stream => {
   const id = (stream as unknown as { id: string }).id;
+  let bytes = 0;
+  stream.on('data', (c: Buffer) => (bytes += c.length));
   const player = spawn('play', SOX, { stdio: ['pipe', 'ignore', 'ignore'] });
   bcPlayers.set(id, player);
   player.stdin!.on('error', () => {});
   stream.pipe(player.stdin!);
-  player.on('exit', () => bcPlayers.delete(id));
+  // Diagnostics: signal !== null means something killed the player (it
+  // shouldn't — back-channels are barge-in-exempt); bytes === 0 means no audio
+  // ever arrived (server sent `done`/`skipped` without deltas).
+  player.on('exit', (code, signal) => {
+    bcPlayers.delete(id);
+    console.log(`\n[backchannel ${id}] player exit code=${code} signal=${signal} bytes=${bytes}`);
+  });
+  console.log(`\n[backchannel ${id}] start`);
 });
-voice.on('backchannel.done', ({ phrase }) => phrase && process.stdout.write(`\n[backchannel] ${phrase}`));
-voice.on('backchannel.skipped', ({ reason }) => void reason);
+voice.on('backchannel.done', ({ backchannel_id, phrase }) =>
+  console.log(`\n[backchannel ${backchannel_id}] done${phrase ? ` "${phrase}"` : ''}`),
+);
+voice.on('backchannel.skipped', ({ reason }) => console.log(`\n[backchannel skipped] ${reason}`));
 
 let lastRole: 'user' | 'assistant' | null = null;
 voice.on('writing', ({ text, role }) => {
